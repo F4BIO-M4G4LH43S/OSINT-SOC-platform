@@ -1,0 +1,10 @@
+Ensure the following ports and Service	Direction are available:
+
+443	Wazuh Dashboard	Inbound
+8081	MISP Web	Inbound
+9000	TheHive	Inbound
+9001	Cortex	Inbound
+3001	Shuffle	Inbound
+8080	OpenCTI	Inbound
+9200	Elasticsearch	Internal
+1514	Wazuh Agents	Inbound
