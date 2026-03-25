@@ -1,0 +1,381 @@
+
+---
+
+### 2. docker-compose.yml (Main Orchestration)
+
+```yaml
+version: '3.8'
+
+services:
+  # ==========================================
+  # WAZUH SIEM/XDR
+  # ==========================================
+  wazuh.manager:
+    image: wazuh/wazuh-manager:4.7.2
+    hostname: wazuh.manager
+    restart: always
+    ports:
+      - "1514:1514"
+      - "1515:1515"
+      - "514:514/udp"
+      - "55000:55000"
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=${WAZUH_INDEXER_PASSWORD:-SecretPassword}
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - API_USERNAME=${WAZUH_API_USERNAME:-wazuh-wui}
+      - API_PASSWORD=${WAZUH_API_PASSWORD:-MyS3cr37P450r.*-}
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agent_groups:/var/ossec/agent_groups
+      - wazuh_wodles:/var/ossec/wodles
+      - ./configs/wazuh/local_rules.xml:/var/ossec/etc/rules/local_rules.xml
+      - ./configs/wazuh/misp-integration.sh:/var/ossec/integrations/misp.py
+    networks:
+      - soc-network
+
+  wazuh.indexer:
+    image: wazuh/wazuh-indexer:4.7.2
+    hostname: wazuh.indexer
+    restart: always
+    ports:
+      - "9200:9200"
+    environment:
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - cluster.name=wazuh-cluster
+      - node.name=wazuh.indexer
+      - SECURITY_ADMIN_PASSWORD=${WAZUH_INDEXER_PASSWORD:-SecretPassword}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - wazuh_indexer_data:/var/lib/wazuh-indexer
+    networks:
+      - soc-network
+
+  wazuh.dashboard:
+    image: wazuh/wazuh-dashboard:4.7.2
+    hostname: wazuh.dashboard
+    restart: always
+    ports:
+      - "443:5601"
+    environment:
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=${WAZUH_INDEXER_PASSWORD:-SecretPassword}
+      - WAZUH_API_URL=https://wazuh.manager
+      - API_USERNAME=${WAZUH_API_USERNAME:-wazuh-wui}
+      - API_PASSWORD=${WAZUH_API_PASSWORD:-MyS3cr37P450r.*-}
+    depends_on:
+      - wazuh.indexer
+      - wazuh.manager
+    networks:
+      - soc-network
+
+  # ==========================================
+  # MISP Threat Intelligence
+  # ==========================================
+  misp:
+    image: coolacid/misp-docker:latest
+    restart: always
+    ports:
+      - "8081:80"
+      - "8443:443"
+    environment:
+      - MYSQL_HOST=misp-db
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=${MISP_MYSQL_PASSWORD:-misp}
+      - MISP_ADMIN_EMAIL=${MISP_ADMIN_EMAIL:-admin@admin.test}
+      - MISP_ADMIN_PASSPHRASE=${MISP_ADMIN_PASSWORD:-admin}
+      - MISP_BASEURL=${MISP_BASEURL:-https://localhost}
+      - MISP_ORG=${MISP_ORG:-SOC-ORG}
+      - MISP_ORG_COUNTRY=${MISP_ORG_COUNTRY:-US}
+      - MISP_EMAIL=${MISP_EMAIL:-admin@admin.test}
+      - MISP_CONTACT=${MISP_CONTACT:-admin@admin.test}
+      - MISP_LIVE=true
+      - MISP_SYSLOG_ENABLED=true
+      - MISP_SYSLOG_HOST=wazuh.manager
+      - MISP_SYSLOG_PORT=514
+    depends_on:
+      - misp-db
+    volumes:
+      - misp_data:/var/www/MISP
+    networks:
+      - soc-network
+
+  misp-db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MISP_MYSQL_ROOT_PASSWORD:-root}
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=${MISP_MYSQL_PASSWORD:-misp}
+    volumes:
+      - misp_mysql_data:/var/lib/mysql
+    networks:
+      - soc-network
+
+  # ==========================================
+  # TheHive Case Management
+  # ==========================================
+  thehive:
+    image: strangebee/thehive:5.2
+    restart: always
+    ports:
+      - "9000:9000"
+    environment:
+      - JVM_OPTS="-Xms1024M -Xmx2048M"
+    volumes:
+      - thehive_data:/opt/thp/thehive/files
+      - ./configs/thehive/application.conf:/etc/thehive/application.conf
+      - ./configs/thehive/logback.xml:/etc/thehive/logback.xml
+    depends_on:
+      - thehive-cassandra
+      - thehive-elasticsearch
+      - cortex
+    networks:
+      - soc-network
+
+  thehive-cassandra:
+    image: cassandra:4.1
+    restart: always
+    environment:
+      - CASSANDRA_CLUSTER_NAME=TheHive
+      - CASSANDRA_KEYSPACE_NAME=thehive
+      - CASSANDRA_USERNAME=cassandra
+      - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD:-cassandra}
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - soc-network
+
+  thehive-elasticsearch:
+    image: elasticsearch:7.17.9
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - thehive_es_data:/usr/share/elasticsearch/data
+    networks:
+      - soc-network
+
+  # ==========================================
+  # Cortex Analysis Engine
+  # ==========================================
+  cortex:
+    image: thehiveproject/cortex:latest
+    restart: always
+    ports:
+      - "9001:9001"
+    environment:
+      - JOB_DIRECTORY=/tmp/cortex-jobs
+    volumes:
+      - cortex_data:/opt/cortex
+      - cortex_jobs:/tmp/cortex-jobs
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./configs/cortex/application.conf:/etc/cortex/application.conf
+    networks:
+      - soc-network
+
+  # ==========================================
+  # Shuffle SOAR
+  # ==========================================
+  shuffle-backend:
+    image: ghcr.io/shuffle/shuffle-backend:latest
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      - SHUFFLE_APP_DOWNLOAD_LOCATION=/shuffle-apps
+      - SHUFFLE_ORG_ID=${SHUFFLE_ORG_ID:-Shuffle}
+      - SHUFFLE_OPENSEARCH_URL=http://shuffle-opensearch:9200
+    volumes:
+      - shuffle_data:/shuffle
+      - shuffle_apps:/shuffle-apps
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - shuffle-opensearch
+      - shuffle-frontend
+    networks:
+      - soc-network
+
+  shuffle-frontend:
+    image: ghcr.io/shuffle/shuffle-frontend:latest
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - BACKEND_HOSTNAME=shuffle-backend
+    networks:
+      - soc-network
+
+  shuffle-opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - shuffle_os_data:/usr/share/opensearch/data
+    networks:
+      - soc-network
+
+  # ==========================================
+  # OpenCTI Cyber Threat Intelligence
+  # ==========================================
+  opencti:
+    image: opencti/platform:6.0.0
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=8096
+      - APP__PORT=8080
+      - APP__BASE_URL=http://localhost:8080
+      - APP__ADMIN__EMAIL=${OPENCTI_ADMIN_EMAIL:-admin@opencti.io}
+      - APP__ADMIN__PASSWORD=${OPENCTI_ADMIN_PASSWORD:-ChangeMePlease}
+      - APP__ADMIN__TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - REDIS__HOSTNAME=opencti-redis
+      - REDIS__PORT=6379
+      - ELASTICSEARCH__URL=http://opencti-elasticsearch:9200
+      - MINIO__ENDPOINT=opencti-minio
+      - MINIO__PORT=9000
+      - MINIO__USE_SSL=false
+      - MINIO__ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO__SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - RABBITMQ__HOSTNAME=opencti-rabbitmq
+      - RABBITMQ__PORT=5672
+      - RABBITMQ__USERNAME=${RABBITMQ_DEFAULT_USER:-opencti}
+      - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS}
+      - SMTP__HOSTNAME=${SMTP_HOSTNAME:-localhost}
+      - PROVIDERS__LOCAL__STRATEGY=LocalStrategy
+    depends_on:
+      - opencti-redis
+      - opencti-elasticsearch
+      - opencti-minio
+      - opencti-rabbitmq
+    networks:
+      - soc-network
+
+  opencti-worker:
+    image: opencti/worker:6.0.0
+    restart: always
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - WORKER_LOG_LEVEL=info
+    depends_on:
+      - opencti
+    networks:
+      - soc-network
+    deploy:
+      replicas: 2
+
+  opencti-redis:
+    image: redis:7.2.4
+    restart: always
+    volumes:
+      - opencti_redis_data:/data
+    networks:
+      - soc-network
+
+  opencti-elasticsearch:
+    image: elasticsearch:8.12.0
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.ml.enabled=false
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - thread_pool.search.queue_size=5000
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opencti_es_data:/usr/share/elasticsearch/data
+    networks:
+      - soc-network
+
+  opencti-minio:
+    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    restart: always
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-opencti}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-changeme}
+    command: server /data --console-address ":9001"
+    volumes:
+      - opencti_s3_data:/data
+    networks:
+      - soc-network
+
+  opencti-rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-opencti}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-opencti}
+    volumes:
+      - opencti_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - soc-network
+
+  # ==========================================
+  # NETWORKS & VOLUMES
+  # ==========================================
+networks:
+  soc-network:
+    driver: bridge
+
+volumes:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agent_groups:
+  wazuh_wodles:
+  wazuh_indexer_data:
+  misp_data:
+  misp_mysql_data:
+  thehive_data:
+  cassandra_data:
+  thehive_es_data:
+  cortex_data:
+  cortex_jobs:
+  shuffle_data:
+  shuffle_apps:
+  shuffle_os_data:
+  opencti_redis_data:
+  opencti_es_data:
+  opencti_s3_data:
+  opencti_rabbitmq_data:
