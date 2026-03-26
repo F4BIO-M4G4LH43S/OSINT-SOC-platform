@@ -1230,20 +1230,20 @@ Common issues and solutions for the OSINT SOC Platform.
 
 **Solutions:**
 
-# Check Docker service
+### Check Docker service
 ```
 sudo systemctl status docker
 sudo systemctl start docker
 ```
-# Check disk space
+### Check disk space
 ```
 df -h
 ```
-# Check memory
+### Check memory
 ```
 free -h
 ```
-# Reset and retry
+### Reset and retry
 ```
 sudo docker compose down -v
 sudo docker compose up -d
@@ -1252,36 +1252,36 @@ Port Conflicts
 Symptom: bind: address already in use
 Check:
 
-# Find process using port
+### Find process using port
 ```
 sudo lsof -i :9000
 ```
-# Kill process or change port in docker-compose.yml
+### Kill process or change port in docker-compose.yml
 
 Permission Denied
 Symptom: Cannot access Docker socket
 Fix:
 
-# Add user to docker group
+### Add user to docker group
 ```
 sudo usermod -aG docker $USER
 newgrp docker
 ```
-# Or use sudo for all commands
+### Or use sudo for all commands
 
 Service-Specific Issues
 Wazuh
 Dashboard not loading:
 
-# Check indexer health
+### Check indexer health
 ```
 curl -k -u admin:password https://localhost:9200/_cluster/health
 ```
-# Restart stack
+### Restart stack
 ```
 sudo docker compose restart wazuh.indexer wazuh.dashboard
 ```
-# Check logs
+### Check logs
 ```
 sudo docker compose logs -f wazuh.indexer
 ```
@@ -1293,12 +1293,12 @@ High memory usage:
 MISP
 Database connection error:
 
-# Check MySQL container
+### Check MySQL container
 ```
 sudo docker compose ps misp-db
 sudo docker compose logs misp-db
 ```
-# Reset database (WARNING: data loss)
+### Reset database (WARNING: data loss)
 sudo docker compose down -v misp-db
 sudo docker compose up -d misp-db
 
@@ -1310,12 +1310,12 @@ Feeds not updating:
 TheHive
 Won't start (Cassandra issues):
 
-# Check Cassandra status
+### Check Cassandra status
 ```
 docker exec -it thehive-cassandra nodetool status
 ```
-# If UN (Up Normal) not shown, wait longer
-# Or reset Cassandra (data loss):
+ If UN (Up Normal) not shown, wait longer
+ Or reset Cassandra (data loss):
 ```
 sudo docker compose down -v thehive-cassandra
 sudo docker compose up -d thehive-cassandra
@@ -1324,41 +1324,41 @@ sudo docker compose up -d thehive
 ```
 Elasticsearch connection error:
 
-# Verify Elasticsearch
+### Verify Elasticsearch
 ```
 curl http://localhost:9200
 ```
-# Check TheHive config
+### Check TheHive config
 ```
 cat configs/thehive/application.conf | grep elasticsearch
 ```
 Cortex
 Analyzers not working:
 
-# Check Cortex logs
+### Check Cortex logs
 ```
 sudo docker compose logs -f cortex
 ```
-# Verify analyzers are enabled
+#### Verify analyzers are enabled
 ```
 curl -H "Authorization: Bearer API_KEY" http://localhost:9001/api/analyzer
 ```
-# Check job directory permissions
+### Check job directory permissions
 ```
 docker exec cortex ls -la /tmp/cortex-jobs
 ```
 Shuffle
 OpenSearch fails:
 
-# System requirement
+### System requirement
 ```
 sudo sysctl -w vm.max_map_count=262144
 ```
-# Check logs
+### Check logs
 ```
 sudo docker compose logs -f shuffle-opensearch
 ```
-# Reset
+### Reset
 ```
 sudo docker compose down -v shuffle-opensearch
 sudo docker compose up -d shuffle-opensearch
@@ -1366,16 +1366,16 @@ sudo docker compose up -d shuffle-opensearch
 OpenCTI
 Platform won't start:
 
-# Check dependencies
+### Check dependencies
 ```
 curl http://localhost:9200/_cluster/health
 docker exec opencti-redis redis-cli ping
 ```
-# Check RabbitMQ
+### Check RabbitMQ
 ```
 docker exec opencti-rabbitmq rabbitmqctl status
 ```
-# View OpenCTI logs
+### View OpenCTI logs
 ```
 sudo docker compose logs -f opencti | grep ERROR
 ```
