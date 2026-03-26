@@ -117,7 +117,7 @@ sudo docker compose down
 | **CPU** | 4 cores | 8 cores | 16+ cores |
 | **RAM** | 16 GB | 32 GB | 64+ GB |
 | **Storage** | 100 GB HDD | 200 GB SSD | 500 GB+ NVMe |
-| **Network** | 100 Mbps | 1 Gbps | 10 Gbps |
+| **Network** | 10 Mbps | 20 Mbps | 100 Mbps |
 
 ## Software Requirements
 
