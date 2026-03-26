@@ -291,12 +291,12 @@ Wazuh automatically integrates with MISP for threat intelligence:
 
 Troubleshooting
 
-''' Dashboard not loading Check wazuh.indexer is healthy: curl http://localhost:9200/_cluster/health
+Dashboard not loading Check wazuh.indexer is healthy: curl http://localhost:9200/_cluster/health
 Agent not connecting Verify firewall allows port 1514/tcp and 1515/tcp
 High memory usage Increase OPENSEARCH_JAVA_OPTS to -Xms2g -Xmx2g
 Next Steps
 Proceed to MISP Installation
----
+
 
 03-misp-installation
 
@@ -311,7 +311,7 @@ MISP is deployed via Docker Compose as part of the main stack.
 Step 1: Deploy MISP
 
 ``
-# MISP is included in docker-compose.yml
+### MISP is included in docker-compose.yml
 ```
 sudo docker compose up -d misp misp-db
 ```
@@ -349,14 +349,14 @@ Enable via API:
 bash
 Copy
 
-# Get API key from MISP UI: Administration → My Profile → Auth keys
+### Get API key from MISP UI: Administration → My Profile → Auth keys
 MISP_API_KEY="your-api-key"
 
 curl -k -X POST https://localhost:8443/feeds/enableFeed/1 \
   -H "Authorization: $MISP_API_KEY" \
   -H "Accept: application/json"
 
-# Fetch all enabled feeds
+### Fetch all enabled feeds
 curl -k -X POST https://localhost:8443/feeds/fetchFromAllFeeds \
   -H "Authorization: $MISP_API_KEY" \
   -H "Accept: application/json"
@@ -365,15 +365,15 @@ Step 5: Configure Taxonomies and Galaxies
 bash
 Copy
 
-# Update taxonomies
+### Update taxonomies
 docker exec -it misp bash
 cd /var/www/MISP/app/Console
 ./cake Admin updateTaxonomies
 
-# Update galaxies
+### Update galaxies
 ./cake Admin updateGalaxies
 
-# Update warning lists
+### Update warning lists
 ./cake Admin updateWarningLists
 
 MISP Configuration for SOC Integration
@@ -401,7 +401,7 @@ Use the provided script to automate feed management:
 bash
 Copy
 
-# Setup all recommended feeds
+### Setup all recommended feeds
 bash scripts/setup-misp-feeds.sh
 
 This script will:
@@ -433,36 +433,36 @@ Copy
 
 ### 10. docs/04-thehive-cortex-installation.md
 
-```markdown
-# TheHive & Cortex Installation Guide
+
+### TheHive & Cortex Installation Guide
 
 TheHive is a scalable security incident response platform. Cortex is the analysis engine that integrates with TheHive for observable analysis.
 
-## Architecture
+### Architecture
 
 - **TheHive**: Case management, collaboration, and incident tracking
 - **Cortex**: Automated analysis of observables (IPs, hashes, URLs)
 - **Cassandra**: Database for TheHive
 - **Elasticsearch**: Indexing for TheHive
 
-## Installation
+### Installation
 
 ### Step 1: Deploy Services
 
 ```bash
 sudo docker compose up -d thehive-cassandra thehive-elasticsearch thehive cortex
-
+```
 Step 2: Wait for Database Initialization
 Cassandra and Elasticsearch need time to initialize:
-bash
-Copy
 
 # Check Cassandra status (wait for "UN" - Up Normal)
+```
 docker exec -it thehive-cassandra nodetool status
-
+```
 # Check Elasticsearch
+```
 curl http://localhost:9200/_cluster/health
-
+```
 Step 3: Access TheHive
 
     Open http://localhost:9000
@@ -508,13 +508,13 @@ Configure Analyzers
         MISP_2_0
 
 Configure Analyzer via API:
-bash
-Copy
 
-# Get Cortex API key from UI
+
+### Get Cortex API key from UI
+```
 CORTEX_API_KEY="your-cortex-key"
 
-# List available analyzers
+### List available analyzers
 curl -H "Authorization: Bearer $CORTEX_API_KEY" \
   http://localhost:9001/api/analyzer
 
@@ -560,13 +560,11 @@ misp {
     }
   ]
 }
-
+```
 Restart TheHive:
-bash
-Copy
-
+```
 sudo docker compose restart thehive
-
+```
 Verification
 Create a test case:
 
@@ -583,20 +581,16 @@ Cortex analyzers fail	Check analyzer configuration and API keys
 MISP integration error	Verify API key and MISP URL in config
 Next Steps
 Proceed to Shuffle SOAR Installation
-plain
-Copy
-
-
 ---
 
-### 11. docs/05-shuffle-installation.md
+### 05-shuffle-installation
 
-```markdown
-# Shuffle SOAR Installation Guide
+
+### Shuffle SOAR Installation Guide
 
 Shuffle is an open-source SOAR (Security Orchestration, Automation and Response) platform for automating security workflows.
 
-## Installation
+### Installation
 
 Shuffle is deployed via Docker Compose.
 
@@ -604,15 +598,14 @@ Shuffle is deployed via Docker Compose.
 
 ```bash
 sudo docker compose up -d shuffle-opensearch shuffle-frontend shuffle-backend
-
+```
 Step 2: Wait for OpenSearch Initialization
-bash
-Copy
 
-# Monitor logs
+### Monitor logs
+```
 sudo docker compose logs -f shuffle-opensearch
-
-# Wait for "Cluster health status changed from [YELLOW] to [GREEN]"
+```
+### Wait for "Cluster health status changed from [YELLOW] to [GREEN]"
 
 Step 3: Access Shuffle
 
@@ -622,12 +615,11 @@ Step 3: Access Shuffle
 
 Step 4: Install Apps
 Shuffle requires apps for integrations:
-bash
-Copy
 
-# Apps are auto-downloaded, but can be manually updated
+### Apps are auto-downloaded, but can be manually updated
+```
 docker exec -it shuffle-backend python3 /shuffle/shuffle-apps/updates.py
-
+```
 Step 5: Configure Workflows
 Import the provided workflow templates:
 
@@ -663,10 +655,8 @@ Wazuh Integration
     Copy webhook URL
     In Wazuh: Configure custom integration
 
-bash
-Copy
-
 # Add to Wazuh manager configuration
+```
 <integration>
   <name>shuffle</name>
   <hook_url>http://shuffle-backend:5001/api/v1/hooks/webhook_xxx</hook_url>
@@ -709,20 +699,15 @@ Apps not loading	Check shuffle-apps volume is mounted correctly
 Workflow execution fails	Check app authentication credentials
 Next Steps
 Proceed to OpenCTI Installation
-plain
-Copy
-
-
----
+```
 
 ### 12. docs/06-opencti-installation.md
 
-```markdown
 # OpenCTI Installation Guide
 
 OpenCTI is an open-source cyber threat intelligence platform for managing and analyzing threat intelligence data with MITRE ATT&CK mapping.
 
-## Installation
+### Installation
 
 OpenCTI is deployed via Docker Compose with multiple dependencies.
 
@@ -730,22 +715,19 @@ OpenCTI is deployed via Docker Compose with multiple dependencies.
 
 ```bash
 sudo docker compose up -d opencti-redis opencti-elasticsearch opencti-minio opencti-rabbitmq
-
+```
 Wait for dependencies to be healthy (2-3 minutes).
 Step 2: Deploy OpenCTI Platform
-bash
-Copy
-
+```
 sudo docker compose up -d opencti opencti-worker
-
+```
 Step 3: Wait for Initialization
 First startup takes 5-10 minutes:
-bash
-Copy
 
 # Monitor logs
+```
 sudo docker compose logs -f opencti
-
+```
 # Wait for "Platform is ready" message
 
 Step 4: Access OpenCTI
@@ -765,18 +747,15 @@ Create Organization
 Configure Connectors
 OpenCTI uses connectors to import data. Key connectors for SOC:
 MITRE ATT&CK Connector:
-yaml
-Copy
 
 # Already configured in docker-compose.yml
 # Verify it's running:
+```
 docker compose ps | grep connector-mitre
-
+```
 MISP Connector:
 Add to docker-compose.yml:
-yaml
-Copy
-
+```
   connector-misp:
     image: opencti/connector-misp:latest
     environment:
@@ -792,11 +771,9 @@ Copy
       - opencti
     networks:
       - soc-network
-
+```
 AlienVault OTX Connector:
-yaml
-Copy
-
+```
   connector-alienvault:
     image: opencti/connector-alienvault:latest
     environment:
@@ -806,7 +783,7 @@ Copy
       - ALIENVAULT_API_KEY=your-otx-key
     networks:
       - soc-network
-
+```
 Step 6: Data Import
 After connectors start, data will automatically import:
 
@@ -833,28 +810,22 @@ Check data is flowing:
     Events → Observations (should see MISP data)
 
 Troubleshooting
-Table
-Issue	Solution
 OpenCTI won't start	Check Elasticsearch is green: curl http://localhost:9200/_cluster/health
 Connectors failing	Verify API keys and network connectivity
 Out of memory	Increase ES_JAVA_OPTS to -Xms4g -Xmx4g
 RabbitMQ connection refused	Wait for RabbitMQ to fully start before starting OpenCTI
 Next Steps
 Proceed to Integration Guide to connect all components.
-plain
-Copy
-
 
 ---
 
 ### 13. docs/07-integration-guide.md
 
-```markdown
-# Complete Integration Guide
+### Complete Integration Guide
 
 This guide connects all SOC platform components into a unified workflow.
 
-## Integration Architecture
+### Integration Architecture
 
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Wazuh     │────▶│   Shuffle   │────▶│  TheHive    │
@@ -876,17 +847,13 @@ This guide connects all SOC platform components into a unified workflow.
 │  (MITRE     │
 │  ATT&CK)    │
 └─────────────┘
-plain
-Copy
 
-
-## Step 1: Wazuh → Shuffle Integration
+### Step 1: Wazuh → Shuffle Integration
 
 ### Configure Wazuh Custom Integration
 
 Edit `configs/wazuh/ossec.conf` or use local configuration:
-
-```xml
+```
 <ossec_config>
   <integration>
     <name>shuffle</name>
@@ -895,7 +862,7 @@ Edit `configs/wazuh/ossec.conf` or use local configuration:
     <alert_format>json</alert_format>
   </integration>
 </ossec_config>
-
+```
 Get Webhook URL from Shuffle:
 
     Shuffle → Triggers → Webhook
@@ -903,12 +870,11 @@ Get Webhook URL from Shuffle:
     Copy URL
 
 Test Integration
-bash
-Copy
 
 # Trigger test alert
+```
 logger -t wazuh-test "Test alert for Shuffle integration"
-
+```
 # Check Shuffle execution logs
 
 Step 2: Shuffle → TheHive Integration
@@ -1046,8 +1012,7 @@ Copy
 
 ### 14. docs/08-osint-feeds-configuration.md
 
-```markdown
-# OSINT Feeds Configuration
+### OSINT Feeds Configuration
 
 Configure comprehensive open-source intelligence feeds for your SOC platform.
 
@@ -1139,10 +1104,9 @@ Copy
       - opencti
     networks:
       - soc-network
-
+```
 Cortex Analyzers OSINT
 Free/OSINT Analyzers
-Table
 Analyzer	Source	Purpose	API Key Required
 AbuseIPDB	AbuseIPDB	IP reputation	Yes (free tier)
 GreyNoise	GreyNoise	Internet noise	Yes (community)
@@ -1172,20 +1136,18 @@ Create custom lists from OSINT feeds:
 bash
 Copy
 
-# Download IP blocklist
+### Download IP blocklist
 curl -o /tmp/blocklist.txt https://lists.blocklist.de/lists/all.txt
 
-# Convert to Wazuh CDB format
+### Convert to Wazuh CDB format
 awk '{print $1 ":1:"}' /tmp/blocklist.txt > /var/ossec/etc/lists/osint-blocklist
 
-# Update Wazuh config
-# Add to ossec.conf:
-# <list>etc/lists/osint-blocklist</list>
+### Update Wazuh config
+### Add to ossec.conf:
+ <list>etc/lists/osint-blocklist</list>
 
 Automated List Updates
 Add to crontab:
-bash
-Copy
 
 # Update OSINT lists daily at 2 AM
 0 2 * * * /var/ossec/integrations/update-osint-lists.sh
@@ -1236,11 +1198,11 @@ Feed Health Monitoring
 bash
 Copy
 
-# Check feed freshness
+### Check feed freshness
 curl -s -H "Authorization: $MISP_API_KEY" \
   https://localhost:8443/feeds | jq '.Feed[] | {name, last_fetch}'
 
-# Verify OpenCTI connector status
+### Verify OpenCTI connector status
 curl -s http://localhost:8080/opencti/connectors
 
 False Positive Management
@@ -1252,79 +1214,77 @@ False Positive Management
 
 Next Steps
 Review Troubleshooting Guide for common issues.
-plain
-Copy
-
-
 ---
 
 ### 15. docs/09-troubleshooting.md
 
-```markdown
-# Troubleshooting Guide
+### Troubleshooting Guide
 
 Common issues and solutions for the OSINT SOC Platform.
 
-## Installation Issues
+### Installation Issues
 
 ### Docker Compose Fails to Start
 
 **Symptom:** `docker compose up` fails with errors
 
 **Solutions:**
-```bash
+
 # Check Docker service
+```
 sudo systemctl status docker
 sudo systemctl start docker
-
+```
 # Check disk space
+```
 df -h
-
+```
 # Check memory
+```
 free -h
-
+```
 # Reset and retry
+```
 sudo docker compose down -v
 sudo docker compose up -d
-
+```
 Port Conflicts
 Symptom: bind: address already in use
 Check:
-bash
-Copy
 
 # Find process using port
+```
 sudo lsof -i :9000
-
+```
 # Kill process or change port in docker-compose.yml
 
 Permission Denied
 Symptom: Cannot access Docker socket
 Fix:
-bash
-Copy
 
 # Add user to docker group
+```
 sudo usermod -aG docker $USER
 newgrp docker
-
+```
 # Or use sudo for all commands
 
 Service-Specific Issues
 Wazuh
 Dashboard not loading:
-bash
-Copy
 
 # Check indexer health
+```
 curl -k -u admin:password https://localhost:9200/_cluster/health
-
+```
 # Restart stack
+```
 sudo docker compose restart wazuh.indexer wazuh.dashboard
-
+```
 # Check logs
+```
 sudo docker compose logs -f wazuh.indexer
-
+```
 High memory usage:
 
     Increase OPENSEARCH_JAVA_OPTS to -Xms2g -Xmx2g
@@ -1332,13 +1292,12 @@ High memory usage:
 
 MISP
 Database connection error:
-bash
-Copy
 
 # Check MySQL container
+```
 sudo docker compose ps misp-db
 sudo docker compose logs misp-db
-
+```
 # Reset database (WARNING: data loss)
 sudo docker compose down -v misp-db
 sudo docker compose up -d misp-db
@@ -1350,79 +1309,82 @@ Feeds not updating:
 
 TheHive
 Won't start (Cassandra issues):
-bash
-Copy
 
 # Check Cassandra status
+```
 docker exec -it thehive-cassandra nodetool status
-
+```
 # If UN (Up Normal) not shown, wait longer
 # Or reset Cassandra (data loss):
+```
 sudo docker compose down -v thehive-cassandra
 sudo docker compose up -d thehive-cassandra
 sleep 60
 sudo docker compose up -d thehive
-
+```
 Elasticsearch connection error:
-bash
-Copy
 
 # Verify Elasticsearch
+```
 curl http://localhost:9200
-
+```
 # Check TheHive config
+```
 cat configs/thehive/application.conf | grep elasticsearch
-
+```
 Cortex
 Analyzers not working:
-bash
-Copy
 
 # Check Cortex logs
+```
 sudo docker compose logs -f cortex
-
+```
 # Verify analyzers are enabled
+```
 curl -H "Authorization: Bearer API_KEY" http://localhost:9001/api/analyzer
-
+```
 # Check job directory permissions
+```
 docker exec cortex ls -la /tmp/cortex-jobs
-
+```
 Shuffle
 OpenSearch fails:
-bash
-Copy
 
 # System requirement
+```
 sudo sysctl -w vm.max_map_count=262144
-
+```
 # Check logs
+```
 sudo docker compose logs -f shuffle-opensearch
-
+```
 # Reset
+```
 sudo docker compose down -v shuffle-opensearch
 sudo docker compose up -d shuffle-opensearch
-
+```
 OpenCTI
 Platform won't start:
-bash
-Copy
 
 # Check dependencies
+```
 curl http://localhost:9200/_cluster/health
 docker exec opencti-redis redis-cli ping
-
+```
 # Check RabbitMQ
+```
 docker exec opencti-rabbitmq rabbitmqctl status
-
+```
 # View OpenCTI logs
+```
 sudo docker compose logs -f opencti | grep ERROR
-
+```
 🤝 Contributing
 Contributions are welcome! Please read our Contributing Guide first.
 📄 License
 This project is licensed under the GPL-3.0 License - see the LICENSE file.
 🙏 Acknowledgments
-
+``
     Wazuh - Security monitoring
     MISP Project - Threat intelligence
     StrangeBee - TheHive & Cortex
@@ -1432,17 +1394,9 @@ This project is licensed under the GPL-3.0 License - see the LICENSE file.
 
 ⚠️ Security Notice
 This platform handles sensitive security data. Before production deployment:
-
+``
     Change all default passwords
     Enable HTTPS/TLS for all services
     Configure proper firewall rules
     Set up regular backups
     Review Security Hardening Guide
-
-```
-```bash
-
-```
-
-
-
