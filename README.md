@@ -231,21 +231,21 @@ The Wazuh services are included in the main docker-compose.yml. Key configuratio
 
 Step 3: Deploy Wazuh
 
-# From the project root
+### From the project root
 ```
 sudo docker compose up -d wazuh.manager wazuh.indexer wazuh.dashboard
 ```
 Step 4: Verify Installation
 
-# Check container status
+### Check container status
 ```
 sudo docker compose ps | grep wazuh
 ```
-# View logs
+### View logs
 ```
 sudo docker compose logs -f wazuh.manager
 ```
-# Check Wazuh API
+### Check Wazuh API
 ```
 curl -k -u wazuh-wui:MyS3cr37P450r.*- https://localhost:55000/security/user/authenticate
 ```
@@ -259,7 +259,7 @@ Step 5: Access Dashboard
 Post-Installation Configuration
 1. Change Default Passwords
 
-# Generate new password hash
+### Generate new password hash
 ```
 docker exec -it wazuh.indexer bash
 /usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh -p 'NewStrongPassword123!'
@@ -267,7 +267,7 @@ docker exec -it wazuh.indexer bash
 ```
 2. Configure Agent Enrollment
 
-# Get enrollment password
+### Get enrollment password
 ```
 docker exec wazuh.manager grep enrollment /var/ossec/etc/ossec.conf
 ```
@@ -291,7 +291,7 @@ Wazuh automatically integrates with MISP for threat intelligence:
 
 Troubleshooting
 
-Dashboard not loading Check wazuh.indexer is healthy: curl http://localhost:9200/_cluster/health
+''' Dashboard not loading Check wazuh.indexer is healthy: curl http://localhost:9200/_cluster/health
 Agent not connecting Verify firewall allows port 1514/tcp and 1515/tcp
 High memory usage Increase OPENSEARCH_JAVA_OPTS to -Xms2g -Xmx2g
 Next Steps
