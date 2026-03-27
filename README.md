@@ -8,7 +8,7 @@
 
 ![SOC Architecture](docs/images/soc-architecture.png)
 
-## 🚀 Quick Start (5 Minutes)
+## 🚀 Quick Start
 
 ```bash
 # 1. Clone the repository
@@ -50,22 +50,22 @@ This platform integrates industry-leading open-source security tools:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        OSINT SOC PLATFORM                        │
+│                        OSINT SOC PLATFORM                       │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
 │  │   Wazuh      │  │    MISP      │  │   OpenCTI    │           │
 │  │   (SIEM)     │  │  (Intel Hub) │  │  (Knowledge) │           │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
-│         │                 │                 │                  │
-│         └─────────────────┼─────────────────┘                  │
-│                           │                                      │
-│                    ┌────────▼────────┐                           │
-│                    │     Shuffle     │                           │
-│                    │     (SOAR)      │                           │
-│                    └────────┬────────┘                           │
-│                             │                                    │
-│         ┌───────────────────┼───────────────────┐                │
-│         ▼                   ▼                   ▼                │
+│         │                 │                 │                   │
+│         └─────────────────┼─────────────────┘                   │
+│                           │                                     │
+│                    ┌──────▼────────┐                            │
+│                    │     Shuffle   │                            │
+│                    │     (SOAR)    │                            │
+│                    └────────┬──────┘                            │
+│                             │                                   │
+│         ┌───────────────────┼───────────────────┐               │
+│         ▼                   ▼                   ▼               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
 │  │    Cortex    │  │   TheHive    │  │  External    │           │
 │  │ (Analyzers)  │  │  (Cases/IR)  │  │   APIs       │           │
@@ -96,13 +96,13 @@ This platform integrates industry-leading open-source security tools:
 ### Method 1: Automated Installation (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/osint-soc-platform/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/F4BIO-M4G4LH43S/osint-soc-platform/main/install.sh | sudo bash
 ```
 
 ### Method 2: Manual Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/osint-soc-platform.git
+git clone https://github.com/F4BIO-M4G4LH43S/osint-soc-platform.git
 cd osint-soc-platform
 sudo ./install.sh
 ```
@@ -216,9 +216,9 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 
 ## 📞 Support
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/YOUR_USERNAME/osint-soc-platform/issues)
-- **Discussions**: [Ask questions or share ideas](https://github.com/YOUR_USERNAME/osint-soc-platform/discussions)
-- **Documentation**: [Full documentation](https://github.com/YOUR_USERNAME/osint-soc-platform/wiki)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/F4BIO-M4G4LH43S/osint-soc-platform/issues)
+- **Discussions**: [Ask questions or share ideas](https://github.com/F4BIO-M4G4LH43S/osint-soc-platform/discussions)
+- **Documentation**: [Full documentation](https://github.com/F4BIO-M4G4LH43S/osint-soc-platform/wiki)
 ---
 
 **⚠️ Security Notice**: This platform handles sensitive security data. Ensure proper network isolation, access controls, and encryption before production deployment.
