@@ -1,10 +1,11 @@
 
----
+# Create the fixed Docker Compose file
+fixed_compose = '''version: '3.8'
 
-### 2. docker-compose.yml (Main Orchestration)
-
-```yaml
-version: '3.8'
+# =============================================================================
+# OSINT SOC Platform - Complete Docker Compose
+# Fixed and Production-Ready Version
+# =============================================================================
 
 services:
   # ==========================================
@@ -12,8 +13,9 @@ services:
   # ==========================================
   wazuh.manager:
     image: wazuh/wazuh-manager:4.7.2
+    container_name: soc-wazuh-manager
     hostname: wazuh.manager
-    restart: always
+    restart: unless-stopped
     ports:
       - "1514:1514"
       - "1515:1515"
@@ -23,7 +25,7 @@ services:
       - INDEXER_URL=https://wazuh.indexer:9200
       - INDEXER_USERNAME=admin
       - INDEXER_PASSWORD=${WAZUH_INDEXER_PASSWORD:-SecretPassword}
-      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - FILEBEAT_SSL_VERIFICATION_MODE=none
       - API_USERNAME=${WAZUH_API_USERNAME:-wazuh-wui}
       - API_PASSWORD=${WAZUH_API_PASSWORD:-MyS3cr37P450r.*-}
     volumes:
@@ -36,24 +38,40 @@ services:
       - wazuh_active_response:/var/ossec/active-response/bin
       - wazuh_agent_groups:/var/ossec/agent_groups
       - wazuh_wodles:/var/ossec/wodles
-      - ./configs/wazuh/local_rules.xml:/var/ossec/etc/rules/local_rules.xml
-      - ./configs/wazuh/misp-integration.sh:/var/ossec/integrations/misp.py
+      - ./configs/wazuh/local_rules.xml:/var/ossec/etc/rules/local_rules.xml:ro
+      - ./configs/wazuh/misp:/var/ossec/etc/lists/misp:ro
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "test", "-S", "/var/ossec/queue/ossec/sec"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
 
   wazuh.indexer:
     image: wazuh/wazuh-indexer:4.7.2
+    container_name: soc-wazuh-indexer
     hostname: wazuh.indexer
-    restart: always
+    restart: unless-stopped
     ports:
       - "9200:9200"
     environment:
-      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g
       - bootstrap.memory_lock=true
       - discovery.type=single-node
       - cluster.name=wazuh-cluster
       - node.name=wazuh.indexer
       - SECURITY_ADMIN_PASSWORD=${WAZUH_INDEXER_PASSWORD:-SecretPassword}
+      - plugins.security.ssl.http.enabled=false
+      - plugins.security.disabled=true
     ulimits:
       memlock:
         soft: -1
@@ -65,31 +83,60 @@ services:
       - wazuh_indexer_data:/var/lib/wazuh-indexer
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
 
   wazuh.dashboard:
     image: wazuh/wazuh-dashboard:4.7.2
+    container_name: soc-wazuh-dashboard
     hostname: wazuh.dashboard
-    restart: always
+    restart: unless-stopped
     ports:
-      - "443:5601"
+      - "5601:5601"
     environment:
       - INDEXER_USERNAME=admin
       - INDEXER_PASSWORD=${WAZUH_INDEXER_PASSWORD:-SecretPassword}
-      - WAZUH_API_URL=https://wazuh.manager
+      - WAZUH_API_URL=https://wazuh.manager:55000
       - API_USERNAME=${WAZUH_API_USERNAME:-wazuh-wui}
       - API_PASSWORD=${WAZUH_API_PASSWORD:-MyS3cr37P450r.*-}
+      - SERVER_SSL_ENABLED=false
     depends_on:
-      - wazuh.indexer
-      - wazuh.manager
+      wazuh.indexer:
+        condition: service_healthy
+      wazuh.manager:
+        condition: service_started
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5601/app/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   # ==========================================
   # MISP Threat Intelligence
   # ==========================================
   misp:
-    image: coolacid/misp-docker:latest
-    restart: always
+    image: coolacid/misp-docker:core-latest
+    container_name: soc-misp
+    restart: unless-stopped
     ports:
       - "8081:80"
       - "8443:443"
@@ -100,25 +147,40 @@ services:
       - MYSQL_PASSWORD=${MISP_MYSQL_PASSWORD:-misp}
       - MISP_ADMIN_EMAIL=${MISP_ADMIN_EMAIL:-admin@admin.test}
       - MISP_ADMIN_PASSPHRASE=${MISP_ADMIN_PASSWORD:-admin}
-      - MISP_BASEURL=${MISP_BASEURL:-https://localhost}
+      - MISP_BASEURL=${MISP_BASEURL:-https://localhost:8443}
       - MISP_ORG=${MISP_ORG:-SOC-ORG}
       - MISP_ORG_COUNTRY=${MISP_ORG_COUNTRY:-US}
       - MISP_EMAIL=${MISP_EMAIL:-admin@admin.test}
       - MISP_CONTACT=${MISP_CONTACT:-admin@admin.test}
       - MISP_LIVE=true
-      - MISP_SYSLOG_ENABLED=true
-      - MISP_SYSLOG_HOST=wazuh.manager
-      - MISP_SYSLOG_PORT=514
+      - MISP_SYSLOG_ENABLED=false
+      - PHP_MEMORY_LIMIT=512M
+      - PHP_MAX_EXECUTION_TIME=300
+      - PHP_UPLOAD_MAX_FILESIZE=50M
+      - PHP_POST_MAX_SIZE=50M
     depends_on:
-      - misp-db
+      misp-db:
+        condition: service_healthy
     volumes:
       - misp_data:/var/www/MISP
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/users/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   misp-db:
     image: mysql:8.0
-    restart: always
+    container_name: soc-misp-db
+    restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=${MISP_MYSQL_ROOT_PASSWORD:-root}
       - MYSQL_DATABASE=misp
@@ -126,61 +188,119 @@ services:
       - MYSQL_PASSWORD=${MISP_MYSQL_PASSWORD:-misp}
     volumes:
       - misp_mysql_data:/var/lib/mysql
+      - ./configs/mysql/misp.cnf:/etc/mysql/conf.d/misp.cnf:ro
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MISP_MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   # ==========================================
   # TheHive Case Management
   # ==========================================
   thehive:
     image: strangebee/thehive:5.2
-    restart: always
+    container_name: soc-thehive
+    restart: unless-stopped
     ports:
       - "9000:9000"
     environment:
-      - JVM_OPTS="-Xms1024M -Xmx2048M"
+      - JVM_OPTS=-Xms2g -Xmx2g
+      - MAX_HEAP_SIZE=2G
+      - MIN_HEAP_SIZE=1G
     volumes:
       - thehive_data:/opt/thp/thehive/files
-      - ./configs/thehive/application.conf:/etc/thehive/application.conf
-      - ./configs/thehive/logback.xml:/etc/thehive/logback.xml
+      - ./configs/thehive/application.conf:/etc/thehive/application.conf:ro
     depends_on:
-      - thehive-cassandra
-      - thehive-elasticsearch
-      - cortex
+      thehive-cassandra:
+        condition: service_healthy
+      thehive-elasticsearch:
+        condition: service_healthy
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '1.5'
 
   thehive-cassandra:
     image: cassandra:4.1
-    restart: always
+    container_name: soc-cassandra
+    restart: unless-stopped
     environment:
-      - CASSANDRA_CLUSTER_NAME=TheHive
+      - CASSANDRA_CLUSTER_NAME=TheHiveCluster
       - CASSANDRA_KEYSPACE_NAME=thehive
       - CASSANDRA_USERNAME=cassandra
       - CASSANDRA_PASSWORD=${CASSANDRA_PASSWORD:-cassandra}
+      - HEAP_NEWSIZE=512M
+      - MAX_HEAP_SIZE=1G
     volumes:
       - cassandra_data:/var/lib/cassandra
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   thehive-elasticsearch:
     image: elasticsearch:7.17.9
-    restart: always
+    container_name: soc-thehive-es
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
       - thehive_es_data:/usr/share/elasticsearch/data
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   # ==========================================
   # Cortex Analysis Engine
   # ==========================================
   cortex:
-    image: thehiveproject/cortex:latest
-    restart: always
+    image: thehiveproject/cortex:3.1.7
+    container_name: soc-cortex
+    restart: unless-stopped
     ports:
       - "9001:9001"
     environment:
@@ -189,49 +309,92 @@ services:
       - cortex_data:/opt/cortex
       - cortex_jobs:/tmp/cortex-jobs
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./configs/cortex/application.conf:/etc/cortex/application.conf
+      - ./configs/cortex/application.conf:/etc/cortex/application.conf:ro
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   # ==========================================
   # Shuffle SOAR
   # ==========================================
   shuffle-backend:
     image: ghcr.io/shuffle/shuffle-backend:latest
-    restart: always
+    container_name: soc-shuffle-backend
+    restart: unless-stopped
     ports:
       - "5001:5001"
     environment:
       - SHUFFLE_APP_DOWNLOAD_LOCATION=/shuffle-apps
       - SHUFFLE_ORG_ID=${SHUFFLE_ORG_ID:-Shuffle}
       - SHUFFLE_OPENSEARCH_URL=http://shuffle-opensearch:9200
+      - SHUFFLE_OPENSEARCH_INDEX_PREFIX=shuffle
+      - SHUFFLE_APP_FORCE_UPDATE=false
     volumes:
       - shuffle_data:/shuffle
       - shuffle_apps:/shuffle-apps
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - shuffle-opensearch
-      - shuffle-frontend
+      shuffle-opensearch:
+        condition: service_healthy
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   shuffle-frontend:
     image: ghcr.io/shuffle/shuffle-frontend:latest
-    restart: always
+    container_name: soc-shuffle-frontend
+    restart: unless-stopped
     ports:
       - "3001:3001"
     environment:
       - BACKEND_HOSTNAME=shuffle-backend
+      - BACKEND_PORT=5001
+    depends_on:
+      shuffle-backend:
+        condition: service_healthy
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
   shuffle-opensearch:
     image: opensearchproject/opensearch:2.11.0
-    restart: always
+    container_name: soc-shuffle-opensearch
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - plugins.security.disabled=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - cluster.routing.allocation.disk.threshold_enabled=false
     ulimits:
       memlock:
         soft: -1
@@ -243,75 +406,123 @@ services:
       - shuffle_os_data:/usr/share/opensearch/data
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   # ==========================================
   # OpenCTI Cyber Threat Intelligence
   # ==========================================
   opencti:
     image: opencti/platform:6.0.0
-    restart: always
+    container_name: soc-opencti
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      - NODE_OPTIONS=--max-old-space-size=8096
+      - NODE_OPTIONS=--max-old-space-size=4096
       - APP__PORT=8080
       - APP__BASE_URL=http://localhost:8080
       - APP__ADMIN__EMAIL=${OPENCTI_ADMIN_EMAIL:-admin@opencti.io}
       - APP__ADMIN__PASSWORD=${OPENCTI_ADMIN_PASSWORD:-ChangeMePlease}
-      - APP__ADMIN__TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - APP__ADMIN__TOKEN=${OPENCTI_ADMIN_TOKEN:-changeme-default-token}
       - REDIS__HOSTNAME=opencti-redis
       - REDIS__PORT=6379
       - ELASTICSEARCH__URL=http://opencti-elasticsearch:9200
       - MINIO__ENDPOINT=opencti-minio
       - MINIO__PORT=9000
       - MINIO__USE_SSL=false
-      - MINIO__ACCESS_KEY=${MINIO_ROOT_USER}
-      - MINIO__SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO__ACCESS_KEY=${MINIO_ROOT_USER:-opencti}
+      - MINIO__SECRET_KEY=${MINIO_ROOT_PASSWORD:-changeme}
       - RABBITMQ__HOSTNAME=opencti-rabbitmq
       - RABBITMQ__PORT=5672
       - RABBITMQ__USERNAME=${RABBITMQ_DEFAULT_USER:-opencti}
-      - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS}
-      - SMTP__HOSTNAME=${SMTP_HOSTNAME:-localhost}
+      - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS:-opencti}
       - PROVIDERS__LOCAL__STRATEGY=LocalStrategy
     depends_on:
-      - opencti-redis
-      - opencti-elasticsearch
-      - opencti-minio
-      - opencti-rabbitmq
+      opencti-redis:
+        condition: service_started
+      opencti-elasticsearch:
+        condition: service_healthy
+      opencti-minio:
+        condition: service_started
+      opencti-rabbitmq:
+        condition: service_healthy
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
 
   opencti-worker:
     image: opencti/worker:6.0.0
-    restart: always
+    container_name: soc-opencti-worker
+    restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080
-      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN:-changeme-default-token}
       - WORKER_LOG_LEVEL=info
     depends_on:
-      - opencti
+      opencti:
+        condition: service_healthy
     networks:
       - soc-network
     deploy:
       replicas: 2
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
   opencti-redis:
     image: redis:7.2.4
-    restart: always
+    container_name: soc-opencti-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
     volumes:
       - opencti_redis_data:/data
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
 
   opencti-elasticsearch:
     image: elasticsearch:8.12.0
-    restart: always
+    container_name: soc-opencti-es
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - xpack.ml.enabled=false
       - xpack.security.enabled=false
-      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
       - thread_pool.search.queue_size=5000
+      - cluster.routing.allocation.disk.threshold_enabled=false
     ulimits:
       memlock:
         soft: -1
@@ -323,22 +534,45 @@ services:
       - opencti_es_data:/usr/share/elasticsearch/data
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
 
   opencti-minio:
     image: minio/minio:RELEASE.2024-01-18T22-51-28Z
-    restart: always
+    container_name: soc-opencti-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-opencti}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-changeme}
-    command: server /data --console-address ":9001"
     volumes:
       - opencti_s3_data:/data
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
   opencti-rabbitmq:
     image: rabbitmq:3.13-management
-    restart: always
+    container_name: soc-opencti-rabbitmq
+    restart: unless-stopped
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-opencti}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-opencti}
@@ -346,13 +580,26 @@ services:
       - opencti_rabbitmq_data:/var/lib/rabbitmq
     networks:
       - soc-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
-  # ==========================================
-  # NETWORKS & VOLUMES
-  # ==========================================
+# ==========================================
+# NETWORKS & VOLUMES
+# ==========================================
 networks:
   soc-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
 volumes:
   wazuh_api_configuration:
@@ -379,3 +626,13 @@ volumes:
   opencti_es_data:
   opencti_s3_data:
   opencti_rabbitmq_data:
+'''
+
+# Save the fixed file
+output_path = "/mnt/kimi/output/osint-soc-platform/docker-compose.yml"
+with open(output_path, "w") as f:
+    f.write(fixed_compose)
+
+print("✅ Fixed Docker Compose file saved to:")
+print(f"   {output_path}")
+print()
