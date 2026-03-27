@@ -1,0 +1,129 @@
+
+# Create GitHub Actions workflow for CI/CD
+github_workflows = '''name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Lint Docker Compose
+      run: |
+        docker-compose -f docker/docker-compose.infra.yml config
+        docker-compose -f docker/docker-compose.security.yml config
+        docker-compose -f docker/docker-compose.osint.yml config
+    
+    - name: ShellCheck
+      run: |
+        shellcheck install.sh
+        shellcheck scripts/*.sh || true
+
+  test-deployment:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup test environment
+      run: |
+        cp .env.example .env
+        sed -i 's/ChangeMe/testpass/g' .env
+    
+    - name: Test Docker Compose
+      run: |
+        docker-compose -f docker/docker-compose.infra.yml config > /dev/null
+        docker-compose -f docker/docker-compose.security.yml config > /dev/null
+        docker-compose -f docker/docker-compose.osint.yml config > /dev/null
+
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build documentation
+      run: |
+        echo "Documentation build placeholder"
+        ls -la docs/
+'''
+
+# Create .github/workflows directory
+os.makedirs(f"{base_dir}/.github/workflows", exist_ok=True)
+
+with open(f"{base_dir}/.github/workflows/ci.yml", "w") as f:
+    f.write(github_workflows)
+
+# Create GitHub issue templates
+bug_template = '''---
+name: Bug report
+about: Create a report to help us improve
+title: '[BUG] '
+labels: bug
+assignees: ''
+
+---
+
+**Describe the bug**
+A clear and concise description of what the bug is.
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
+
+**Expected behavior**
+A clear and concise description of what you expected to happen.
+
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
+
+**Environment (please complete the following information):**
+ - OS: [e.g. Ubuntu 22.04]
+ - Docker version: [e.g. 24.0]
+ - RAM: [e.g. 16GB]
+
+**Additional context**
+Add any other context about the problem here.
+'''
+
+os.makedirs(f"{base_dir}/.github/ISSUE_TEMPLATE", exist_ok=True)
+
+with open(f"{base_dir}/.github/ISSUE_TEMPLATE/bug_report.md", "w") as f:
+    f.write(bug_template)
+
+feature_template = '''---
+name: Feature request
+about: Suggest an idea for this project
+title: '[FEATURE] '
+labels: enhancement
+assignees: ''
+
+---
+
+**Is your feature request related to a problem? Please describe.**
+A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+
+**Describe the solution you'd like**
+A clear and concise description of what you want to happen.
+
+**Describe alternatives you've considered**
+A clear and concise description of any alternative solutions or features you've considered.
+
+**Additional context**
+Add any other context or screenshots about the feature request here.
+'''
+
+with open(f"{base_dir}/.github/ISSUE_TEMPLATE/feature_request.md", "w") as f:
+    f.write(feature_template)
+
+print("✅ .github/workflows/ci.yml created")
+print("✅ .github/ISSUE_TEMPLATE/bug_report.md created")
+print("✅ .github/ISSUE_TEMPLATE/feature_request.md created")
