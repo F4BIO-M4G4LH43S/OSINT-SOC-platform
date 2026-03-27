@@ -222,11 +222,3 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 ---
 
 **⚠️ Security Notice**: This platform handles sensitive security data. Ensure proper network isolation, access controls, and encryption before production deployment.
-
-**🚀 Ready to deploy?** Start with the [Quick Start Guide](QUICKSTART.md)!
-'''
-
-with open(f"{base_dir}/README.md", "w") as f:
-    f.write(readme_update)
-
-print("✅ README.md updated with comprehensive instructions")
