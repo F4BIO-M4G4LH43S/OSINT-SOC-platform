@@ -12,7 +12,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/osint-soc-platform.git
+git clone https://github.com/F4BIO-M4G4LH43S/osint-soc-platform.git
 cd osint-soc-platform
 
 # 2. Run the installer
